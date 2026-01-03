@@ -1,0 +1,445 @@
+openapi: 3.0.3
+info:
+  title: Cloud Photo Server API
+  description: |
+    Mac miniをiPhoneの写真クラウドストレージとして使用するためのAPI。
+    写真のアップロード、ダウンロード、一覧取得、削除、サムネイル取得などの機能を提供します。
+  version: 1.0.0
+  contact:
+    name: Cloud Photo Server
+
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+
+tags:
+  - name: Photos
+    description: 写真の管理API
+  - name: Health
+    description: ヘルスチェックAPI
+
+paths:
+  /api/v1/photos:
+    get:
+      tags:
+        - Photos
+      summary: 写真一覧取得
+      description: 保存されている写真の一覧をページネーション付きで取得します。
+      operationId: listPhotos
+      parameters:
+        - name: page
+          in: query
+          description: ページ番号 (1から開始)
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: perPage
+          in: query
+          description: 1ページあたりの件数
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: sortBy
+          in: query
+          description: ソート基準
+          schema:
+            type: string
+            enum: [createdAt, filename, size]
+            default: createdAt
+        - name: order
+          in: query
+          description: ソート順
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+        - name: year
+          in: query
+          description: 年でフィルタリング
+          schema:
+            type: integer
+            example: 2024
+        - name: month
+          in: query
+          description: 月でフィルタリング (1-12)
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 12
+      responses:
+        '200':
+          description: 写真一覧
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedPhotosResponse'
+        '400':
+          description: 不正なリクエスト
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    post:
+      tags:
+        - Photos
+      summary: 写真アップロード
+      description: |
+        写真をアップロードします。
+        - EXIF情報（カメラ、GPS、撮影日時等）を自動抽出
+        - サムネイル（300x300）を自動生成
+        - SHA256チェックサムで重複を検出
+      operationId: uploadPhoto
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: アップロードする画像ファイル (JPEG, PNG, HEIC, WebP)
+      responses:
+        '200':
+          description: アップロード成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PhotoUploadResponse'
+        '400':
+          description: 不正なファイル形式またはファイルサイズ超過
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: 重複する写真が既に存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/photos/{id}:
+    get:
+      tags:
+        - Photos
+      summary: 写真詳細取得
+      description: 指定したIDの写真のメタデータを取得します。
+      operationId: getPhoto
+      parameters:
+        - $ref: '#/components/parameters/PhotoId'
+      responses:
+        '200':
+          description: 写真詳細
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Photo'
+        '400':
+          description: 不正なID形式
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: 写真が見つからない
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      tags:
+        - Photos
+      summary: 写真削除
+      description: 指定したIDの写真を削除します。オリジナルファイル、サムネイル、メタデータがすべて削除されます。
+      operationId: deletePhoto
+      parameters:
+        - $ref: '#/components/parameters/PhotoId'
+      responses:
+        '204':
+          description: 削除成功
+        '400':
+          description: 不正なID形式
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: 写真が見つからない
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/photos/{id}/download:
+    get:
+      tags:
+        - Photos
+      summary: 写真ダウンロード
+      description: 指定したIDの写真のオリジナルファイルをダウンロードします。
+      operationId: downloadPhoto
+      parameters:
+        - $ref: '#/components/parameters/PhotoId'
+      responses:
+        '200':
+          description: 写真ファイル
+          headers:
+            Content-Disposition:
+              description: ダウンロード用ファイル名
+              schema:
+                type: string
+                example: 'attachment; filename="IMG_0001.jpg"'
+            ETag:
+              description: ファイルのチェックサム
+              schema:
+                type: string
+            Cache-Control:
+              description: キャッシュ制御
+              schema:
+                type: string
+                example: 'private, max-age=31536000'
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+            image/png:
+              schema:
+                type: string
+                format: binary
+            image/heic:
+              schema:
+                type: string
+                format: binary
+            image/webp:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: 不正なID形式
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: 写真が見つからない
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/photos/{id}/thumbnail:
+    get:
+      tags:
+        - Photos
+      summary: サムネイル取得
+      description: 指定したIDの写真のサムネイル画像（300x300 JPEG）を取得します。
+      operationId: getThumbnail
+      parameters:
+        - $ref: '#/components/parameters/PhotoId'
+      responses:
+        '200':
+          description: サムネイル画像
+          headers:
+            ETag:
+              description: サムネイルのチェックサム
+              schema:
+                type: string
+            Cache-Control:
+              description: キャッシュ制御
+              schema:
+                type: string
+                example: 'public, max-age=86400'
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: 不正なID形式
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: 写真またはサムネイルが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/health:
+    get:
+      tags:
+        - Health
+      summary: ヘルスチェック
+      description: サーバーの稼働状態を確認します。
+      operationId: healthCheck
+      responses:
+        '200':
+          description: サーバー稼働中
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+components:
+  parameters:
+    PhotoId:
+      name: id
+      in: path
+      required: true
+      description: 写真のUUID
+      schema:
+        type: string
+        format: uuid
+        example: '550e8400-e29b-41d4-a716-446655440000'
+
+  schemas:
+    Photo:
+      type: object
+      required:
+        - id
+        - filename
+        - mimeType
+        - size
+        - createdAt
+        - checksum
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: 写真の一意識別子
+          example: '550e8400-e29b-41d4-a716-446655440000'
+        filename:
+          type: string
+          description: オリジナルファイル名
+          example: 'IMG_0001.jpg'
+        mimeType:
+          type: string
+          description: MIMEタイプ
+          example: 'image/jpeg'
+        size:
+          type: integer
+          format: int64
+          description: ファイルサイズ（バイト）
+          example: 2456789
+        width:
+          type: integer
+          nullable: true
+          description: 画像の幅（ピクセル）
+          example: 4000
+        height:
+          type: integer
+          nullable: true
+          description: 画像の高さ（ピクセル）
+          example: 3000
+        createdAt:
+          type: string
+          format: date-time
+          description: アップロード日時
+          example: '2024-01-15T10:30:00Z'
+        takenAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: 撮影日時（EXIFから抽出）
+          example: '2024-01-14T15:45:30Z'
+        checksum:
+          type: string
+          description: SHA256チェックサム
+          example: 'a3f2b8c9d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1'
+
+    PaginatedPhotosResponse:
+      type: object
+      required:
+        - data
+        - pagination
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Photo'
+        pagination:
+          $ref: '#/components/schemas/PaginationInfo'
+
+    PaginationInfo:
+      type: object
+      required:
+        - page
+        - perPage
+        - totalItems
+        - totalPages
+      properties:
+        page:
+          type: integer
+          description: 現在のページ番号
+          example: 1
+        perPage:
+          type: integer
+          description: 1ページあたりの件数
+          example: 20
+        totalItems:
+          type: integer
+          description: 総件数
+          example: 150
+        totalPages:
+          type: integer
+          description: 総ページ数
+          example: 8
+
+    PhotoUploadResponse:
+      type: object
+      required:
+        - photo
+        - message
+      properties:
+        photo:
+          $ref: '#/components/schemas/Photo'
+        message:
+          type: string
+          description: 成功メッセージ
+          example: 'Photo uploaded successfully'
+
+    HealthResponse:
+      type: object
+      required:
+        - status
+        - version
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded]
+          description: サーバーの状態
+          example: 'healthy'
+        version:
+          type: string
+          description: APIバージョン
+          example: '1.0.0'
+        storageAvailable:
+          type: boolean
+          description: ストレージの利用可能状態
+          example: true
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - reason
+      properties:
+        error:
+          type: boolean
+          description: エラーフラグ
+          example: true
+        reason:
+          type: string
+          description: エラーの理由
+          example: 'Photo not found'
