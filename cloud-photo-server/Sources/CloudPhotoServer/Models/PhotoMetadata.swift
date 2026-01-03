@@ -12,6 +12,8 @@ struct PhotoMetadata: Codable, Sendable {
     let takenAt: Date?
     let checksum: String
     let storagePath: String
+    let thumbnailPath: String?
+    let exifData: ExifData?
 
     init(
         id: UUID = UUID(),
@@ -23,7 +25,9 @@ struct PhotoMetadata: Codable, Sendable {
         createdAt: Date = Date(),
         takenAt: Date? = nil,
         checksum: String,
-        storagePath: String
+        storagePath: String,
+        thumbnailPath: String? = nil,
+        exifData: ExifData? = nil
     ) {
         self.id = id
         self.originalFilename = originalFilename
@@ -35,5 +39,7 @@ struct PhotoMetadata: Codable, Sendable {
         self.takenAt = takenAt
         self.checksum = checksum
         self.storagePath = storagePath
+        self.thumbnailPath = thumbnailPath
+        self.exifData = exifData
     }
 }
