@@ -1,0 +1,70 @@
+name: CloudPhotoApp
+options:
+  bundleIdPrefix: com.cloudphoto
+  deploymentTarget:
+    iOS: "16.0"
+  xcodeVersion: "15.0"
+  generateEmptyDirectories: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    MARKETING_VERSION: "1.0.0"
+    CURRENT_PROJECT_VERSION: "1"
+
+targets:
+  CloudPhotoApp:
+    type: application
+    platform: iOS
+    sources:
+      - path: CloudPhotoApp
+        excludes:
+          - "**/.DS_Store"
+    settings:
+      base:
+        INFOPLIST_FILE: CloudPhotoApp/Resources/Info.plist
+        PRODUCT_BUNDLE_IDENTIFIER: com.cloudphoto.app
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: ""
+    info:
+      path: CloudPhotoApp/Resources/Info.plist
+      properties:
+        CFBundleDisplayName: CloudPhoto
+        CFBundleName: $(PRODUCT_NAME)
+        CFBundleIdentifier: $(PRODUCT_BUNDLE_IDENTIFIER)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundlePackageType: APPL
+        CFBundleExecutable: $(EXECUTABLE_NAME)
+        UILaunchScreen:
+          UIColorName: ""
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UIBackgroundModes:
+          - fetch
+          - processing
+        BGTaskSchedulerPermittedIdentifiers:
+          - com.cloudphoto.sync
+        NSPhotoLibraryUsageDescription: "写真をバックアップするためにフォトライブラリへのアクセスが必要です。"
+        NSLocalNetworkUsageDescription: "ローカルネットワーク上のサーバーに接続するために必要です。"
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+
+  CloudPhotoAppTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: CloudPhotoAppTests
+    dependencies:
+      - target: CloudPhotoApp
+    settings:
+      base:
+        INFOPLIST_FILE: CloudPhotoAppTests/Info.plist
