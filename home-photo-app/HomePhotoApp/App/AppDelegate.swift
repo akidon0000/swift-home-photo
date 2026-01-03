@@ -2,7 +2,7 @@ import UIKit
 import BackgroundTasks
 
 class AppDelegate: NSObject, UIApplicationDelegate {
-    static let backgroundSyncTaskIdentifier = "com.cloudphoto.sync"
+    static let backgroundSyncTaskIdentifier = "com.homephoto.sync"
 
     func application(
         _ application: UIApplication,

@@ -137,7 +137,7 @@ struct WelcomeStepView: View {
                 .font(.system(size: 80))
                 .foregroundStyle(.blue)
 
-            Text("Welcome to CloudPhoto")
+            Text("Welcome to HomePhoto")
                 .font(.largeTitle)
                 .fontWeight(.bold)
 
@@ -229,7 +229,7 @@ struct PhotoPermissionStepView: View {
                 .font(.title)
                 .fontWeight(.bold)
 
-            Text("CloudPhoto needs access to your photo library to back up your photos.")
+            Text("HomePhoto needs access to your photo library to back up your photos.")
                 .font(.body)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)

@@ -1,7 +1,7 @@
 import XCTest
-@testable import CloudPhotoApp
+@testable import HomePhotoApp
 
-final class CloudPhotoAppTests: XCTestCase {
+final class HomePhotoAppTests: XCTestCase {
     func testPhotoModelDecoding() throws {
         let json = """
         {

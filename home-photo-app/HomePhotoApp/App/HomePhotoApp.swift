@@ -2,7 +2,7 @@ import SwiftUI
 import BackgroundTasks
 
 @main
-struct CloudPhotoApp: App {
+struct HomePhotoApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @StateObject private var syncEngine = SyncEngine()
     @StateObject private var settingsManager = SettingsManager.shared

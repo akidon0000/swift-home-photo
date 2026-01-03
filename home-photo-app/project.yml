@@ -1,6 +1,6 @@
-name: CloudPhotoApp
+name: HomePhotoApp
 options:
-  bundleIdPrefix: com.cloudphoto
+  bundleIdPrefix: com.homephoto
   deploymentTarget:
     iOS: "16.0"
   xcodeVersion: "15.0"
@@ -13,24 +13,24 @@ settings:
     CURRENT_PROJECT_VERSION: "1"
 
 targets:
-  CloudPhotoApp:
+  HomePhotoApp:
     type: application
     platform: iOS
     sources:
-      - path: CloudPhotoApp
+      - path: HomePhotoApp
         excludes:
           - "**/.DS_Store"
     settings:
       base:
-        INFOPLIST_FILE: CloudPhotoApp/Resources/Info.plist
-        PRODUCT_BUNDLE_IDENTIFIER: com.cloudphoto.app
+        INFOPLIST_FILE: HomePhotoApp/Resources/Info.plist
+        PRODUCT_BUNDLE_IDENTIFIER: com.homephoto.app
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: ""
     info:
-      path: CloudPhotoApp/Resources/Info.plist
+      path: HomePhotoApp/Resources/Info.plist
       properties:
-        CFBundleDisplayName: CloudPhoto
+        CFBundleDisplayName: HomePhoto
         CFBundleName: $(PRODUCT_NAME)
         CFBundleIdentifier: $(PRODUCT_BUNDLE_IDENTIFIER)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
@@ -52,19 +52,19 @@ targets:
           - fetch
           - processing
         BGTaskSchedulerPermittedIdentifiers:
-          - com.cloudphoto.sync
+          - com.homephoto.sync
         NSPhotoLibraryUsageDescription: "写真をバックアップするためにフォトライブラリへのアクセスが必要です。"
         NSLocalNetworkUsageDescription: "ローカルネットワーク上のサーバーに接続するために必要です。"
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
 
-  CloudPhotoAppTests:
+  HomePhotoAppTests:
     type: bundle.unit-test
     platform: iOS
     sources:
-      - path: CloudPhotoAppTests
+      - path: HomePhotoAppTests
     dependencies:
-      - target: CloudPhotoApp
+      - target: HomePhotoApp
     settings:
       base:
-        INFOPLIST_FILE: CloudPhotoAppTests/Info.plist
+        INFOPLIST_FILE: HomePhotoAppTests/Info.plist
