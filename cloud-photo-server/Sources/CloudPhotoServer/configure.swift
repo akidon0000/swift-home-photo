@@ -9,8 +9,12 @@ public func configure(_ app: Application) async throws {
     let config = StorageConfig(basePath: basePath)
     app.storageConfig = config
 
-    // 画像処理サービス初期化
+    // 画像処理サービス初期化 (プラットフォーム別)
+    #if os(Linux)
+    let imageProcessor = VipsImageProcessor(thumbnailMaxSize: 300)
+    #else
     let imageProcessor = CoreGraphicsImageProcessor(thumbnailMaxSize: 300)
+    #endif
     app.imageProcessingService = imageProcessor
 
     // メタデータストア初期化

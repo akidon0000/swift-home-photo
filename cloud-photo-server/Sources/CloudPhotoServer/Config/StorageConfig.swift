@@ -20,8 +20,15 @@ struct StorageConfig: Sendable {
         if let customPath = Environment.get("PHOTO_STORAGE_PATH") {
             return customPath
         }
+
+        #if os(Linux)
+        // Linux (Docker) では /app/data を使用
+        return "/app/data"
+        #else
+        // macOS では Application Support を使用
         let home = FileManager.default.homeDirectoryForCurrentUser.path
         return "\(home)/Library/Application Support/CloudPhotoServer"
+        #endif
     }
 }
 

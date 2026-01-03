@@ -1,7 +1,10 @@
 import Foundation
+import Crypto
+
+#if canImport(CoreGraphics)
 import CoreGraphics
 import ImageIO
-import Crypto
+#endif
 
 /// 画像処理エラー
 enum ImageProcessingError: Error {
@@ -25,7 +28,8 @@ protocol ImageProcessingService: Sendable {
     func calculateChecksum(from data: Data) -> String
 }
 
-/// CoreGraphics ベースの画像処理実装
+#if canImport(CoreGraphics)
+/// CoreGraphics ベースの画像処理実装 (macOS専用)
 final class CoreGraphicsImageProcessor: ImageProcessingService, Sendable {
     private let thumbnailMaxSize: Int
 
@@ -164,3 +168,4 @@ final class CoreGraphicsImageProcessor: ImageProcessingService, Sendable {
         return formatter.date(from: dateString)
     }
 }
+#endif
