@@ -33,4 +33,20 @@ protocol PhotoStorageService: Sendable {
 
     /// 写真が存在するか確認
     func photoExists(id: UUID) async throws -> Bool
+
+    /// 写真をアップロード
+    func uploadPhoto(
+        filename: String,
+        data: Data,
+        mimeType: String
+    ) async throws -> Photo
+
+    /// 写真を削除
+    func deletePhoto(id: UUID) async throws
+
+    /// サムネイルファイルパスを取得
+    func getThumbnailFilePath(id: UUID) async throws -> String
+
+    /// チェックサムで重複を検索
+    func findByChecksum(_ checksum: String) async throws -> Photo?
 }
