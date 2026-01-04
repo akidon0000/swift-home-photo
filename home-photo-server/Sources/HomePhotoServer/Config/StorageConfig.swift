@@ -2,34 +2,35 @@ import Foundation
 import Vapor
 
 /// ストレージ設定
+///
+/// 写真ファイルの保存先パスを管理する。
+/// メタデータは PostgreSQL で管理するため、ファイルパスは含まない。
 struct StorageConfig: Sendable {
+    /// ベースディレクトリ
     let basePath: String
+
+    /// オリジナル画像の保存先
     let photosPath: String
+
+    /// サムネイル画像の保存先
     let thumbnailsPath: String
-    let metadataPath: String
 
     init(basePath: String) {
         self.basePath = basePath
         self.photosPath = "\(basePath)/photos/originals"
         self.thumbnailsPath = "\(basePath)/thumbnails"
-        self.metadataPath = "\(basePath)/metadata.json"
     }
 
     /// デフォルトのストレージパスを取得
+    ///
+    /// 優先順位:
+    /// 1. 環境変数 `PHOTO_STORAGE_PATH`
+    /// 2. デフォルト: `/app/data`
     static func defaultBasePath() -> String {
-        // env が存在すればそのパスを使用
         if let customPath = Environment.get("PHOTO_STORAGE_PATH") {
             return customPath
         }
-
-        #if os(Linux)
-        // Linux (Docker) では /app/data を使用
         return "/app/data"
-        #else
-        // macOS では Application Support を使用
-        let home = FileManager.default.homeDirectoryForCurrentUser.path
-        return "\(home)/Library/Application Support/HomePhotoServer"
-        #endif
     }
 }
 

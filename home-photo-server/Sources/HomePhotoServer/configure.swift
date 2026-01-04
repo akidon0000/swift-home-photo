@@ -11,49 +11,38 @@ public func configure(_ app: Application) async throws {
     let config = StorageConfig(basePath: basePath)
     app.storageConfig = config
 
-    // 画像処理サービス初期化 (プラットフォーム別)
-    #if os(Linux)
+    // 画像処理サービス初期化
     let imageProcessor = VipsImageProcessor(thumbnailMaxSize: 300)
-    #else
-    let imageProcessor = CoreGraphicsImageProcessor(thumbnailMaxSize: 300)
-    #endif
     app.imageProcessingService = imageProcessor
 
-    // メタデータストア初期化 (環境に応じて切り替え)
-    let metadataStore: any MetadataStore
-
-    if let dbConfig = DatabaseConfig.fromEnvironment() {
-        // PostgreSQL 設定
-        app.databases.use(
-            .postgres(
-                configuration: .init(
-                    hostname: dbConfig.hostname,
-                    port: dbConfig.port,
-                    username: dbConfig.username,
-                    password: dbConfig.password,
-                    database: dbConfig.database,
-                    tls: .prefer(try .init(configuration: .clientDefault))
-                )
-            ),
-            as: .psql
-        )
-
-        // マイグレーション登録
-        app.migrations.add(CreatePhotoMetadata())
-        app.migrations.add(CreateExifData())
-
-        // マイグレーション実行
-        try await app.autoMigrate()
-
-        metadataStore = FluentMetadataStore(database: app.db)
-        app.logger.info("Using PostgreSQL metadata store")
-    } else {
-        // JSON ストアにフォールバック
-        metadataStore = JSONMetadataStore(filePath: config.metadataPath)
-        app.logger.info("Using JSON file metadata store (DATABASE_* env not set)")
+    // PostgreSQL 設定 (必須)
+    guard let dbConfig = DatabaseConfig.fromEnvironment() else {
+        fatalError("Database configuration required. Set DATABASE_HOST, DATABASE_USERNAME, DATABASE_PASSWORD, DATABASE_NAME environment variables.")
     }
 
+    app.databases.use(
+        .postgres(
+            configuration: .init(
+                hostname: dbConfig.hostname,
+                port: dbConfig.port,
+                username: dbConfig.username,
+                password: dbConfig.password,
+                database: dbConfig.database,
+                tls: .prefer(try .init(configuration: .clientDefault))
+            )
+        ),
+        as: .psql
+    )
+
+    // マイグレーション登録・実行
+    app.migrations.add(CreatePhotoMetadata())
+    app.migrations.add(CreateExifData())
+    try await app.autoMigrate()
+
+    // メタデータストア初期化
+    let metadataStore = FluentMetadataStore(database: app.db)
     app.metadataStore = metadataStore
+    app.logger.info("Using PostgreSQL metadata store")
 
     // 写真ストレージサービス初期化
     let photoService = LocalPhotoStorageService(

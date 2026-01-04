@@ -1,9 +1,11 @@
 import Foundation
 import Crypto
 
-#if os(Linux)
-/// libvips を使用した Linux 向け画像処理実装
-/// コマンドラインの vips/vipsthumbnail を使用
+/// Linux 用画像処理サービス (libvips + exiftool)
+///
+/// - サムネイル生成: libvips (`vipsthumbnail`)
+/// - EXIF 抽出: exiftool
+/// - チェックサム: swift-crypto (SHA256)
 final class VipsImageProcessor: ImageProcessingService, Sendable {
     private let thumbnailMaxSize: Int
 
@@ -12,62 +14,128 @@ final class VipsImageProcessor: ImageProcessingService, Sendable {
     }
 
     func extractExifData(from data: Data) async throws -> ExifData? {
-        // Linux では EXIF 抽出は vips では難しいため、簡易実装
-        // 将来的には libexif などを使用可能
-        return nil
+        let tempFile = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString + ".jpg")
+
+        defer {
+            try? FileManager.default.removeItem(at: tempFile)
+        }
+
+        try data.write(to: tempFile)
+
+        // exiftool で JSON 形式で EXIF 情報を取得
+        let process = Process()
+        let pipe = Pipe()
+
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/exiftool")
+        process.arguments = ["-json", "-n", tempFile.path]
+        process.standardOutput = pipe
+        process.standardError = FileHandle.nullDevice
+
+        try process.run()
+        process.waitUntilExit()
+
+        guard process.terminationStatus == 0 else {
+            return nil
+        }
+
+        let outputData = pipe.fileHandleForReading.readDataToEndOfFile()
+
+        guard let jsonArray = try? JSONSerialization.jsonObject(with: outputData) as? [[String: Any]],
+              let exifDict = jsonArray.first else {
+            return nil
+        }
+
+        // 撮影日時をパース
+        var dateTimeOriginal: Date?
+        if let dateStr = exifDict["DateTimeOriginal"] as? String {
+            dateTimeOriginal = parseExifDate(dateStr)
+        }
+
+        // GPS 座標を取得
+        let latitude = exifDict["GPSLatitude"] as? Double
+        let longitude = exifDict["GPSLongitude"] as? Double
+        let altitude = exifDict["GPSAltitude"] as? Double
+
+        // シャッタースピードをフォーマット
+        var shutterSpeed: String?
+        if let exposureTime = exifDict["ExposureTime"] as? Double {
+            if exposureTime >= 1 {
+                shutterSpeed = String(format: "%.1f\"", exposureTime)
+            } else {
+                shutterSpeed = "1/\(Int(1.0 / exposureTime))"
+            }
+        }
+
+        return ExifData(
+            cameraMake: exifDict["Make"] as? String,
+            cameraModel: exifDict["Model"] as? String,
+            lensModel: exifDict["LensModel"] as? String,
+            focalLength: exifDict["FocalLength"] as? Double,
+            aperture: exifDict["FNumber"] as? Double,
+            shutterSpeed: shutterSpeed,
+            iso: exifDict["ISO"] as? Int,
+            latitude: latitude,
+            longitude: longitude,
+            altitude: altitude,
+            dateTimeOriginal: dateTimeOriginal
+        )
     }
 
     func getImageDimensions(from data: Data) async throws -> (width: Int, height: Int)? {
-        let tempFile = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let tempFile = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString + ".jpg")
 
-        do {
-            try data.write(to: tempFile)
-            defer { try? FileManager.default.removeItem(at: tempFile) }
+        defer {
+            try? FileManager.default.removeItem(at: tempFile)
+        }
 
-            let process = Process()
-            process.executableURL = URL(fileURLWithPath: "/usr/bin/vipsheader")
-            process.arguments = ["-f", "width", tempFile.path]
+        try data.write(to: tempFile)
 
-            let widthPipe = Pipe()
-            process.standardOutput = widthPipe
-            process.standardError = FileHandle.nullDevice
+        // vipsheader で画像サイズを取得
+        let process = Process()
+        let pipe = Pipe()
 
-            try process.run()
-            process.waitUntilExit()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/vipsheader")
+        process.arguments = ["-f", "width", tempFile.path]
+        process.standardOutput = pipe
+        process.standardError = FileHandle.nullDevice
 
-            guard process.terminationStatus == 0 else { return nil }
+        try process.run()
+        process.waitUntilExit()
 
-            let widthData = widthPipe.fileHandleForReading.readDataToEndOfFile()
-            guard let widthStr = String(data: widthData, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
-                  let width = Int(widthStr) else { return nil }
-
-            // Get height
-            let heightProcess = Process()
-            heightProcess.executableURL = URL(fileURLWithPath: "/usr/bin/vipsheader")
-            heightProcess.arguments = ["-f", "height", tempFile.path]
-
-            let heightPipe = Pipe()
-            heightProcess.standardOutput = heightPipe
-            heightProcess.standardError = FileHandle.nullDevice
-
-            try heightProcess.run()
-            heightProcess.waitUntilExit()
-
-            guard heightProcess.terminationStatus == 0 else { return nil }
-
-            let heightData = heightPipe.fileHandleForReading.readDataToEndOfFile()
-            guard let heightStr = String(data: heightData, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
-                  let height = Int(heightStr) else { return nil }
-
-            return (width, height)
-        } catch {
+        let widthData = pipe.fileHandleForReading.readDataToEndOfFile()
+        guard let widthStr = String(data: widthData, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
+              let width = Int(widthStr) else {
             return nil
         }
+
+        // height を取得
+        let process2 = Process()
+        let pipe2 = Pipe()
+
+        process2.executableURL = URL(fileURLWithPath: "/usr/bin/vipsheader")
+        process2.arguments = ["-f", "height", tempFile.path]
+        process2.standardOutput = pipe2
+        process2.standardError = FileHandle.nullDevice
+
+        try process2.run()
+        process2.waitUntilExit()
+
+        let heightData = pipe2.fileHandleForReading.readDataToEndOfFile()
+        guard let heightStr = String(data: heightData, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
+              let height = Int(heightStr) else {
+            return nil
+        }
+
+        return (width, height)
     }
 
     func generateThumbnail(from data: Data, maxSize: Int) async throws -> Data {
-        let tempInput = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".jpg")
-        let tempOutput = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + "_thumb.jpg")
+        let tempInput = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString + ".jpg")
+        let tempOutput = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString + "_thumb.jpg")
 
         defer {
             try? FileManager.default.removeItem(at: tempInput)
@@ -76,11 +144,13 @@ final class VipsImageProcessor: ImageProcessingService, Sendable {
 
         try data.write(to: tempInput)
 
+        // vipsthumbnail でサムネイル生成
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/vipsthumbnail")
         process.arguments = [
             tempInput.path,
             "-s", "\(maxSize)x\(maxSize)",
+            "--rotate",  // EXIF に基づいて回転
             "-o", tempOutput.path + "[Q=80]"
         ]
         process.standardError = FileHandle.nullDevice
@@ -89,7 +159,7 @@ final class VipsImageProcessor: ImageProcessingService, Sendable {
         process.waitUntilExit()
 
         guard process.terminationStatus == 0 else {
-            throw ImageProcessingError.thumbnailGenerationFailed
+            throw AppError.imageProcessingError("Failed to generate thumbnail")
         }
 
         return try Data(contentsOf: tempOutput)
@@ -99,5 +169,14 @@ final class VipsImageProcessor: ImageProcessingService, Sendable {
         let digest = SHA256.hash(data: data)
         return digest.compactMap { String(format: "%02x", $0) }.joined()
     }
+
+    // MARK: - Private
+
+    /// EXIF 日付文字列をパース (例: "2025:01:15 10:30:00")
+    private func parseExifDate(_ dateStr: String) -> Date? {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy:MM:dd HH:mm:ss"
+        formatter.timeZone = TimeZone.current
+        return formatter.date(from: dateStr)
+    }
 }
-#endif
